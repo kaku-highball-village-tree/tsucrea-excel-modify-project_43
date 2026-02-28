@@ -247,6 +247,62 @@ def normalize_project_names_in_row(objRows: List[List[str]], iRowIndex: int) -> 
         objTargetRow[iIndex] = normalize_project_name(pszProjectName)
 
 
+def is_valid_project_subject_name(pszName: str) -> bool:
+    pszText: str = (pszName or "").strip()
+    if pszText == "":
+        return True
+
+    objAllowedNames: set[str] = {
+        "科目名",
+        "合計",
+        "本部",
+        "1Cカンパニー販管費",
+        "2Cカンパニー販管費",
+        "3Cカンパニー販管費",
+        "4Cカンパニー販管費",
+        "事業開発カンパニー販管費",
+        "社長室カンパニー販管費",
+        "本部カンパニー販管費",
+        "その他",
+    }
+    if pszText in objAllowedNames:
+        return True
+
+    return re.match(r"^(P\d{5}|[A-OQ-Z]\d{3})[ _\t　].+", pszText) is not None
+
+
+def collect_invalid_project_subject_cells(
+    objRows: List[List[str]],
+    objTargetRowIndices: List[int],
+) -> List[tuple[int, int, str]]:
+    objInvalidCells: List[tuple[int, int, str]] = []
+    for iRowIndex in objTargetRowIndices:
+        if iRowIndex < 0 or iRowIndex >= len(objRows):
+            continue
+        objRow = objRows[iRowIndex]
+        for iColumnIndex, pszValue in enumerate(objRow):
+            if is_valid_project_subject_name(pszValue):
+                continue
+            objInvalidCells.append((iRowIndex + 1, iColumnIndex + 1, pszValue))
+    return objInvalidCells
+
+
+def write_project_name_validation_error_file(
+    pszErrorFilePath: str,
+    pszInputFilePath: str,
+    objInvalidCells: List[tuple[int, int, str]],
+) -> None:
+    with open(pszErrorFilePath, mode="w", encoding="utf-8", newline="") as objErrorFile:
+        objErrorFile.write("プロジェクト名形式エラー\n")
+        objErrorFile.write(f"入力ファイル: {pszInputFilePath}\n")
+        objErrorFile.write(f"エラー件数: {len(objInvalidCells)}\n")
+        objErrorFile.write("\n")
+        for iRowNumber, iColumnNumber, pszValue in objInvalidCells:
+            objErrorFile.write(
+                f"行:{iRowNumber} 列:{iColumnNumber} 値:{pszValue}\n"
+            )
+
+
 def find_row_index_with_subject_tab(objRows: List[List[str]], iStartIndex: int) -> int | None:
     for iRowIndex in range(iStartIndex, len(objRows)):
         objRow = objRows[iRowIndex]
@@ -381,6 +437,14 @@ def main() -> int:
                 normalize_project_names_in_row(objRows, iSubjectRowIndex)
             append_debug_log("project names normalized")
 
+            objValidationTargetRowIndices: List[int] = [7]
+            if iSubjectRowIndex is not None and iSubjectRowIndex != 7:
+                objValidationTargetRowIndices.append(iSubjectRowIndex)
+            objInvalidCells = collect_invalid_project_subject_cells(
+                objRows,
+                objValidationTargetRowIndices,
+            )
+
             pszRowA: str = objRows[1][1] if len(objRows[1]) > 1 else ""
             append_debug_log(f"B2 value: {pszRowA}")
             pszRowANormalized: str = re.sub(r"[ \u3000]", "", pszRowA)
@@ -397,6 +461,20 @@ def main() -> int:
                 append_debug_log("period matches filename")
 
             pszMonth: str = f"{iFileMonth:02d}"
+            if objInvalidCells:
+                iExitCode = 1
+                pszProjectNameValidationErrorPath: str = (
+                    f"損益計算書_{iFileYear}年{pszMonth}月_プロジェクト名形式エラー_error.txt"
+                )
+                write_project_name_validation_error_file(
+                    pszProjectNameValidationErrorPath,
+                    pszInputFilePath,
+                    objInvalidCells,
+                )
+                append_debug_log(
+                    f"project name format error file written: {pszProjectNameValidationErrorPath}"
+                )
+
             pszOutputFilePath: str = f"損益計算書_{iFileYear}年{pszMonth}月.tsv"
             pszCostReportFilePath: str = f"製造原価報告書_{iFileYear}年{pszMonth}月.tsv"
             objOutputRows: List[List[str]] = []
