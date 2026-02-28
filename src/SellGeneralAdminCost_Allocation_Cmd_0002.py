@@ -4325,6 +4325,20 @@ def create_pj_summary(
         pszDirectory,
         f"損益計算書_販管費配賦_{iEndYear}年{pszEndMonth}月_A∪B_プロジェクト名_C∪D_vertical.tsv",
     )
+    pszSingleSummaryStep0002PathCp: str = os.path.join(
+        pszDirectory,
+        (
+            "0001_CP別_step0002_単月_損益計算書_"
+            f"{iEndYear}年{pszEndMonth}月.tsv"
+        ),
+    )
+    pszSingleSummaryStep0003PathCp: str = os.path.join(
+        pszDirectory,
+        (
+            "0001_CP別_step0003_単月_損益計算書_"
+            f"{iEndYear}年{pszEndMonth}月.tsv"
+        ),
+    )
     pszCumulativePlPath: str = build_cumulative_file_path(
         pszDirectory,
         "損益計算書",
@@ -4357,6 +4371,18 @@ def create_pj_summary(
             objCumulativeRows = transpose_rows(read_tsv_rows(pszCumulativePlPathHorizontal))
 
     if objSingleRows is None:
+        if objStart == objEnd and os.path.isfile(pszSingleSummaryStep0002PathCp):
+            objCompanyMapCpSingle = load_org_table_company_map(os.path.join(pszDirectory, "管轄PJ表.tsv"))
+            objSingleSummaryStep0003RowsCp, objSingleSummaryStep0003DebugRowsCp = build_step0003_rows_with_debug(
+                read_tsv_rows(pszSingleSummaryStep0002PathCp),
+                objCompanyMapCpSingle,
+            )
+            write_tsv_rows(pszSingleSummaryStep0003PathCp, objSingleSummaryStep0003RowsCp)
+            pszSingleSummaryStep0003DebugPathCp: str = pszSingleSummaryStep0003PathCp.replace(
+                ".tsv",
+                "_debug.tsv",
+            )
+            write_tsv_rows(pszSingleSummaryStep0003DebugPathCp, objSingleSummaryStep0003DebugRowsCp)
         return
     if objCumulativeRows is None and objStart != objEnd:
         return
@@ -4410,13 +4436,6 @@ def create_pj_summary(
             read_tsv_rows(pszSingleSummaryPathCp0002)
         )
         write_tsv_rows(pszSingleSummaryStep0002PathCp0002, objSingleSummaryStep0002RowsCp0002)
-        pszSingleSummaryStep0002PathCp: str = os.path.join(
-            pszDirectory,
-            (
-                "0001_CP別_step0002_単月_損益計算書_"
-                f"{iEndYear}年{pszEndMonth}月.tsv"
-            ),
-        )
         objSingleSummaryStep0002RowsCp = combine_company_sg_admin_columns(
             read_tsv_rows(pszSingleSummaryPathCp)
         )
@@ -4425,13 +4444,6 @@ def create_pj_summary(
             pszDirectory,
             (
                 "0002_CP別_step0003_単月_損益計算書_"
-                f"{iEndYear}年{pszEndMonth}月.tsv"
-            ),
-        )
-        pszSingleSummaryStep0003PathCp: str = os.path.join(
-            pszDirectory,
-            (
-                "0001_CP別_step0003_単月_損益計算書_"
                 f"{iEndYear}年{pszEndMonth}月.tsv"
             ),
         )
