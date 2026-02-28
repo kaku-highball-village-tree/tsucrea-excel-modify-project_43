@@ -462,7 +462,6 @@ def main() -> int:
 
             pszMonth: str = f"{iFileMonth:02d}"
             if objInvalidCells:
-                iExitCode = 1
                 pszProjectNameValidationErrorPath: str = (
                     f"損益計算書_{iFileYear}年{pszMonth}月_プロジェクト名形式エラー_error.txt"
                 )
