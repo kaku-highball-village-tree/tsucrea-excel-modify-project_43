@@ -314,8 +314,6 @@ def find_total_row_index(objRows: List[List[str]]) -> int:
 
 def collect_allocation_target_row_indices(objRows: List[List[str]]) -> List[int]:
     objCompanyPattern = re.compile(r"^C\d{3}(?:_|$)")
-    objProjectPatternP = re.compile(r"^P\d{5}_")
-    objProjectPatternOther = re.compile(r"^(?![CP])[A-Z]\d{3}_")
 
     iLastCompanyRowIndex: int = -1
     for iRowIndex in range(1, len(objRows)):
@@ -331,10 +329,9 @@ def collect_allocation_target_row_indices(objRows: List[List[str]]) -> List[int]
     for iRowIndex in range(iLastCompanyRowIndex + 1, len(objRows)):
         objRow = objRows[iRowIndex]
         pszFirstColumn: str = (objRow[0] if objRow else "").strip()
-        if objProjectPatternP.match(pszFirstColumn) or objProjectPatternOther.match(pszFirstColumn):
-            objTargetRowIndices.append(iRowIndex)
-            continue
-        break
+        if pszFirstColumn == "":
+            break
+        objTargetRowIndices.append(iRowIndex)
     return objTargetRowIndices
 
 
@@ -376,6 +373,7 @@ def calculate_allocation(
     if not objTargetRowIndices:
         return
 
+    objFilteredTargetRowIndices: List[int] = []
     objManhourSeconds: List[float] = []
     fTotalManhours: float = 0.0
     for iRowIndex in objTargetRowIndices:
@@ -383,6 +381,9 @@ def calculate_allocation(
         fManhourSeconds: float = 0.0
         if iManhourColumnIndex < len(objRow):
             fManhourSeconds = parse_time_to_seconds(objRow[iManhourColumnIndex])
+        if fManhourSeconds <= 0.0:
+            continue
+        objFilteredTargetRowIndices.append(iRowIndex)
         objManhourSeconds.append(fManhourSeconds)
         fTotalManhours += fManhourSeconds
 
@@ -399,12 +400,12 @@ def calculate_allocation(
         objBaseValues: List[int] = [int(fRawValue // 1) for fRawValue in objRawValues]
         iRemain: int = iTargetTotal - sum(objBaseValues)
 
-        objRankIndices: List[int] = list(range(len(objTargetRowIndices)))
+        objRankIndices: List[int] = list(range(len(objFilteredTargetRowIndices)))
         objRankIndices.sort(
             key=lambda iIndex: (
                 objRawValues[iIndex] - objBaseValues[iIndex],
                 objManhourSeconds[iIndex],
-                -objTargetRowIndices[iIndex],
+                -objFilteredTargetRowIndices[iIndex],
             ),
             reverse=True,
         )
@@ -423,7 +424,7 @@ def calculate_allocation(
             for fManhourSeconds in objManhourSeconds
         ]
 
-    for iTargetIndex, iRowIndex in enumerate(objTargetRowIndices):
+    for iTargetIndex, iRowIndex in enumerate(objFilteredTargetRowIndices):
         objRow = objRows[iRowIndex]
         if iAllocationColumnIndex >= len(objRow):
             iAppendCount: int = iAllocationColumnIndex + 1 - len(objRow)
