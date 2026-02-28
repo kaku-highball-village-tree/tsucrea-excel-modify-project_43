@@ -2274,10 +2274,19 @@ def build_cp_period_ranges_from_previous_period_range_file(
     objCurrentRanges: List[Tuple[Tuple[int, int], Tuple[int, int]]] = []
 
     def parse_range_lines(iIndexStart: int) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
-        if iIndexStart + 2 >= len(objLines):
+        iStartLineIndex: int = iIndexStart + 1
+        while iStartLineIndex < len(objLines) and objLines[iStartLineIndex] == "":
+            iStartLineIndex += 1
+
+        iEndLineIndex: int = iStartLineIndex + 1
+        while iEndLineIndex < len(objLines) and objLines[iEndLineIndex] == "":
+            iEndLineIndex += 1
+
+        if iStartLineIndex >= len(objLines) or iEndLineIndex >= len(objLines):
             return None
-        objStartMatch = re.match(r"^開始:\s*(\d{4})/(\d{2})$", objLines[iIndexStart + 1])
-        objEndMatch = re.match(r"^終了:\s*(\d{4})/(\d{2})$", objLines[iIndexStart + 2])
+
+        objStartMatch = re.match(r"^開始:\s*(\d{4})/(\d{2})$", objLines[iStartLineIndex])
+        objEndMatch = re.match(r"^終了:\s*(\d{4})/(\d{2})$", objLines[iEndLineIndex])
         if objStartMatch is None or objEndMatch is None:
             return None
         iStartYear = int(objStartMatch.group(1))
@@ -2285,6 +2294,8 @@ def build_cp_period_ranges_from_previous_period_range_file(
         iEndYear = int(objEndMatch.group(1))
         iEndMonth = int(objEndMatch.group(2))
         if not (1 <= iStartMonth <= 12 and 1 <= iEndMonth <= 12):
+            return None
+        if (iStartYear, iStartMonth) > (iEndYear, iEndMonth):
             return None
         return (iStartYear, iStartMonth), (iEndYear, iEndMonth)
 
