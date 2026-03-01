@@ -468,6 +468,35 @@ def write_tsv_rows(pszOutputPath: str, objRows: List[List[str]]) -> None:
             objOutputFile.write("\t".join(objRow) + "\n")
 
 
+def zero_sell_general_admin_cost_for_step0002_targets(objRows: List[List[str]]) -> None:
+    if not objRows:
+        return
+
+    iSellGeneralAdminCostColumnIndex: int = -1
+    objHeaderRow: List[str] = objRows[0]
+    for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
+        if pszColumnName == "販売費及び一般管理費計":
+            iSellGeneralAdminCostColumnIndex = iColumnIndex
+            break
+    if iSellGeneralAdminCostColumnIndex < 0:
+        return
+
+    objTargetNames: set[str] = {
+        "本部",
+        "C006_社長室カンパニー販管費",
+        "C007_本部カンパニー販管費",
+    }
+    for iRowIndex in range(1, len(objRows)):
+        objRow: List[str] = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if pszFirstColumn not in objTargetNames:
+            continue
+        if iSellGeneralAdminCostColumnIndex >= len(objRow):
+            iAppendCount: int = iSellGeneralAdminCostColumnIndex + 1 - len(objRow)
+            objRow.extend([""] * iAppendCount)
+        objRow[iSellGeneralAdminCostColumnIndex] = "0"
+
+
 def build_step0002_variant_path(pszOutputStep0002Path: str, pszSuffix: str) -> str:
     if pszOutputStep0002Path.lower().endswith(".tsv"):
         return pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
@@ -483,6 +512,8 @@ def generate_step0002_variant_from_step0001(
 ) -> None:
     pszVariantPath: str = build_step0002_variant_path(pszOutputStep0002Path, pszSuffix)
     objRows: List[List[str]] = load_tsv_rows(pszOutputStep0001Path)
+    zero_sell_general_admin_cost_for_step0002_targets(objRows)
+
     (
         iSellGeneralAdminCostColumnIndex,
         iAllocationColumnIndex,
@@ -1107,6 +1138,8 @@ def process_pl_tsv(
     with open(pszOutputStep0001Path, "w", encoding="utf-8", newline="") as objOutputFile:
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
+
+    zero_sell_general_admin_cost_for_step0002_targets(objRows)
 
     (
         iSellGeneralAdminCostColumnIndex,
