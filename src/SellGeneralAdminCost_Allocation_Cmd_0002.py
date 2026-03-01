@@ -1363,8 +1363,6 @@ def process_pl_tsv(
             iNetProfitColumnIndex,
         )
 
-    objRows = apply_step0006_second_row_totals(objRows)
-
     with open(pszOutputStep0006Path, "w", encoding="utf-8", newline="") as objOutputFile:
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
