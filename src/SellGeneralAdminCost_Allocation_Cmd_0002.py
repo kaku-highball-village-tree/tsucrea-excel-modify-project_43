@@ -5756,6 +5756,52 @@ def create_cumulative_report(
     print(f"Output: {pszVerticalOutputPath}")
 
 
+def create_cumulative_report_without_company_columns(
+    pszDirectory: str,
+    objRange: Tuple[Tuple[int, int], Tuple[int, int]],
+) -> None:
+    pszSourcePath: str = build_cumulative_file_path(pszDirectory, "損益計算書", objRange[0], objRange[1])
+    if not os.path.isfile(pszSourcePath):
+        return
+
+    objRows: List[List[str]] = read_tsv_rows(pszSourcePath)
+    if not objRows:
+        return
+
+    objRemovalTargets = {
+        "1Cカンパニー販管費",
+        "2Cカンパニー販管費",
+        "3Cカンパニー販管費",
+        "4Cカンパニー販管費",
+        "事業開発カンパニー販管費",
+    }
+    objHeader: List[str] = objRows[0]
+    objKeepIndices: List[int] = [
+        iColumnIndex
+        for iColumnIndex, pszColumnName in enumerate(objHeader)
+        if pszColumnName not in objRemovalTargets
+    ]
+
+    objOutputRows: List[List[str]] = []
+    for objRow in objRows:
+        objOutputRows.append([
+            objRow[iColumnIndex] if iColumnIndex < len(objRow) else ""
+            for iColumnIndex in objKeepIndices
+        ])
+
+    pszOutputPath: str = build_cumulative_file_path(
+        pszDirectory,
+        "損益計算書_カンパニー列なし",
+        objRange[0],
+        objRange[1],
+    )
+    write_tsv_rows(pszOutputPath, objOutputRows)
+    print(f"Output: {pszOutputPath}")
+    pszVerticalOutputPath: str = pszOutputPath.replace(".tsv", "_vertical.tsv")
+    write_tsv_rows(pszVerticalOutputPath, transpose_rows(objOutputRows))
+    print(f"Output: {pszVerticalOutputPath}")
+
+
 def build_pj_summary_range(
     objRange: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
@@ -5811,6 +5857,7 @@ def create_cumulative_reports(pszPlPath: str) -> None:
             objRangeItem,
             pszInputPrefix="損益計算書_販管費配賦",
         )
+        create_cumulative_report_without_company_columns(pszDirectory, objRangeItem)
         create_cumulative_report(pszDirectory, "製造原価報告書", objRangeItem)
         create_pj_summary(
             pszPlPath,
