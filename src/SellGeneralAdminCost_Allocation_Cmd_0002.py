@@ -468,6 +468,35 @@ def write_tsv_rows(pszOutputPath: str, objRows: List[List[str]]) -> None:
             objOutputFile.write("\t".join(objRow) + "\n")
 
 
+def zero_sell_general_admin_cost_for_step0002_targets(objRows: List[List[str]]) -> None:
+    if not objRows:
+        return
+
+    iSellGeneralAdminCostColumnIndex: int = -1
+    objHeaderRow: List[str] = objRows[0]
+    for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
+        if pszColumnName == "販売費及び一般管理費計":
+            iSellGeneralAdminCostColumnIndex = iColumnIndex
+            break
+    if iSellGeneralAdminCostColumnIndex < 0:
+        return
+
+    objTargetNames: set[str] = {
+        "本部",
+        "C006_社長室カンパニー販管費",
+        "C007_本部カンパニー販管費",
+    }
+    for iRowIndex in range(1, len(objRows)):
+        objRow: List[str] = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if pszFirstColumn not in objTargetNames:
+            continue
+        if iSellGeneralAdminCostColumnIndex >= len(objRow):
+            iAppendCount: int = iSellGeneralAdminCostColumnIndex + 1 - len(objRow)
+            objRow.extend([""] * iAppendCount)
+        objRow[iSellGeneralAdminCostColumnIndex] = "0"
+
+
 def build_step0002_variant_path(pszOutputStep0002Path: str, pszSuffix: str) -> str:
     if pszOutputStep0002Path.lower().endswith(".tsv"):
         return pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
@@ -483,6 +512,8 @@ def generate_step0002_variant_from_step0001(
 ) -> None:
     pszVariantPath: str = build_step0002_variant_path(pszOutputStep0002Path, pszSuffix)
     objRows: List[List[str]] = load_tsv_rows(pszOutputStep0001Path)
+    zero_sell_general_admin_cost_for_step0002_targets(objRows)
+
     (
         iSellGeneralAdminCostColumnIndex,
         iAllocationColumnIndex,
@@ -1108,6 +1139,8 @@ def process_pl_tsv(
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
 
+    zero_sell_general_admin_cost_for_step0002_targets(objRows)
+
     (
         iSellGeneralAdminCostColumnIndex,
         iAllocationColumnIndex,
@@ -1329,8 +1362,6 @@ def process_pl_tsv(
             iPreTaxProfitColumnIndex,
             iNetProfitColumnIndex,
         )
-
-    objRows = apply_step0006_second_row_totals(objRows)
 
     with open(pszOutputStep0006Path, "w", encoding="utf-8", newline="") as objOutputFile:
         for objRow in objRows:
@@ -1679,7 +1710,7 @@ def move_pl_tsv_files_into_income_statement_temp_subfolder(pszBaseDirectory: str
     pszTargetDirectory: str = os.path.join(pszTempDirectory, "損益計算書_販管費配賦後")
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
-    objPattern = re.compile(r"^損益計算書_販管費配賦_.*\.tsv$")
+    objPattern = re.compile(r"^(損益計算書_販管費配賦_|累計_損益計算書_販管費配賦_).*.tsv$")
     objSourceDirectories: List[str] = [pszBaseDirectory, pszTempDirectory]
     for pszSourceDirectory in objSourceDirectories:
         if not os.path.isdir(pszSourceDirectory):
@@ -1709,6 +1740,8 @@ def move_monthly_income_statement_tsv_files_into_temp_subfolder(pszBaseDirectory
     ]
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
         if not any(objPattern.match(pszFileName) for objPattern in objPatterns):
+            continue
+        if pszFileName.startswith("累計_損益計算書_販管費配賦_"):
             continue
         pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
         if not os.path.isfile(pszSourcePath):
@@ -5760,7 +5793,12 @@ def create_cumulative_report_without_company_columns(
     pszDirectory: str,
     objRange: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> None:
-    pszSourcePath: str = build_cumulative_file_path(pszDirectory, "損益計算書", objRange[0], objRange[1])
+    pszSourcePath: str = build_cumulative_file_path(
+        pszDirectory,
+        "損益計算書_販管費配賦",
+        objRange[0],
+        objRange[1],
+    )
     if not os.path.isfile(pszSourcePath):
         return
 
@@ -5791,7 +5829,7 @@ def create_cumulative_report_without_company_columns(
 
     pszOutputPath: str = build_cumulative_file_path(
         pszDirectory,
-        "損益計算書_カンパニー列なし",
+        "損益計算書_販管費配賦_カンパニー列なし",
         objRange[0],
         objRange[1],
     )
@@ -5853,7 +5891,7 @@ def create_cumulative_reports(pszPlPath: str) -> None:
     for objRangeItem in objAllRanges:
         create_cumulative_report(
             pszDirectory,
-            "損益計算書",
+            "損益計算書_販管費配賦",
             objRangeItem,
             pszInputPrefix="損益計算書_販管費配賦",
         )
