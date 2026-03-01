@@ -5760,7 +5760,12 @@ def create_cumulative_report_without_company_columns(
     pszDirectory: str,
     objRange: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> None:
-    pszSourcePath: str = build_cumulative_file_path(pszDirectory, "損益計算書", objRange[0], objRange[1])
+    pszSourcePath: str = build_cumulative_file_path(
+        pszDirectory,
+        "損益計算書_販管費配賦",
+        objRange[0],
+        objRange[1],
+    )
     if not os.path.isfile(pszSourcePath):
         return
 
@@ -5791,7 +5796,7 @@ def create_cumulative_report_without_company_columns(
 
     pszOutputPath: str = build_cumulative_file_path(
         pszDirectory,
-        "損益計算書_カンパニー列なし",
+        "損益計算書_販管費配賦_カンパニー列なし",
         objRange[0],
         objRange[1],
     )
@@ -5853,7 +5858,7 @@ def create_cumulative_reports(pszPlPath: str) -> None:
     for objRangeItem in objAllRanges:
         create_cumulative_report(
             pszDirectory,
-            "損益計算書",
+            "損益計算書_販管費配賦",
             objRangeItem,
             pszInputPrefix="損益計算書_販管費配賦",
         )
