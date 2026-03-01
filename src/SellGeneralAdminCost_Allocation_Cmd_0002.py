@@ -1679,7 +1679,7 @@ def move_pl_tsv_files_into_income_statement_temp_subfolder(pszBaseDirectory: str
     pszTargetDirectory: str = os.path.join(pszTempDirectory, "損益計算書_販管費配賦後")
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
-    objPattern = re.compile(r"^損益計算書_販管費配賦_.*\.tsv$")
+    objPattern = re.compile(r"^(損益計算書_販管費配賦_|累計_損益計算書_販管費配賦_).*.tsv$")
     objSourceDirectories: List[str] = [pszBaseDirectory, pszTempDirectory]
     for pszSourceDirectory in objSourceDirectories:
         if not os.path.isdir(pszSourceDirectory):
@@ -1709,6 +1709,8 @@ def move_monthly_income_statement_tsv_files_into_temp_subfolder(pszBaseDirectory
     ]
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
         if not any(objPattern.match(pszFileName) for objPattern in objPatterns):
+            continue
+        if pszFileName.startswith("累計_損益計算書_販管費配賦_"):
             continue
         pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
         if not os.path.isfile(pszSourcePath):
@@ -5760,7 +5762,12 @@ def create_cumulative_report_without_company_columns(
     pszDirectory: str,
     objRange: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> None:
-    pszSourcePath: str = build_cumulative_file_path(pszDirectory, "損益計算書", objRange[0], objRange[1])
+    pszSourcePath: str = build_cumulative_file_path(
+        pszDirectory,
+        "損益計算書_販管費配賦",
+        objRange[0],
+        objRange[1],
+    )
     if not os.path.isfile(pszSourcePath):
         return
 
@@ -5791,7 +5798,7 @@ def create_cumulative_report_without_company_columns(
 
     pszOutputPath: str = build_cumulative_file_path(
         pszDirectory,
-        "損益計算書_カンパニー列なし",
+        "損益計算書_販管費配賦_カンパニー列なし",
         objRange[0],
         objRange[1],
     )
