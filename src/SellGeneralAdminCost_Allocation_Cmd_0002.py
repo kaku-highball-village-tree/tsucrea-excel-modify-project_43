@@ -6945,13 +6945,17 @@ def create_step0010_pj_income_statement_vertical_excel_from_tsv(
 
 
 def copy_excel_sheet_contents(objSourceSheet, objDestinationSheet) -> None:
+    objDestinationSheet.sheet_format = copy(objSourceSheet.sheet_format)
+    objDestinationSheet.sheet_properties = copy(objSourceSheet.sheet_properties)
+    objDestinationSheet.page_margins = copy(objSourceSheet.page_margins)
+    objDestinationSheet.page_setup = copy(objSourceSheet.page_setup)
+    objDestinationSheet.print_options = copy(objSourceSheet.print_options)
+
     for iRowIndex, objDimension in objSourceSheet.row_dimensions.items():
-        if objDimension.height is not None:
-            objDestinationSheet.row_dimensions[iRowIndex].height = objDimension.height
+        objDestinationSheet.row_dimensions[iRowIndex] = copy(objDimension)
 
     for pszColumnName, objDimension in objSourceSheet.column_dimensions.items():
-        if objDimension.width is not None:
-            objDestinationSheet.column_dimensions[pszColumnName].width = objDimension.width
+        objDestinationSheet.column_dimensions[pszColumnName] = copy(objDimension)
 
     for objRow in objSourceSheet.iter_rows():
         for objCell in objRow:
@@ -6995,30 +6999,28 @@ def create_step0010_pj_income_statement_both_excel(
     if not os.path.isfile(pszNormalExcelPath) or not os.path.isfile(pszVerticalExcelPath):
         return None
 
-    objNormalWorkbook = load_workbook(pszNormalExcelPath)
-    objVerticalWorkbook = load_workbook(pszVerticalExcelPath)
-    if not objNormalWorkbook.worksheets or not objVerticalWorkbook.worksheets:
-        return None
-
-    from openpyxl import Workbook
-
-    objBothWorkbook = Workbook()
-    objDefaultSheet = objBothWorkbook.active
-    objBothWorkbook.remove(objDefaultSheet)
-
-    objNormalSourceSheet = objNormalWorkbook.worksheets[0]
-    objVerticalSourceSheet = objVerticalWorkbook.worksheets[0]
-
-    objNormalSheet = objBothWorkbook.create_sheet(title=objNormalSourceSheet.title)
-    copy_excel_sheet_contents(objNormalSourceSheet, objNormalSheet)
-
-    objVerticalSheet = objBothWorkbook.create_sheet(title=objVerticalSourceSheet.title)
-    copy_excel_sheet_contents(objVerticalSourceSheet, objVerticalSheet)
-
     pszOutputPath: str = os.path.join(
         os.path.dirname(pszNormalExcelPath),
         f"販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D_両方.xlsx",
     )
+    shutil.copy2(pszNormalExcelPath, pszOutputPath)
+
+    objBothWorkbook = load_workbook(pszOutputPath)
+    objVerticalWorkbook = load_workbook(pszVerticalExcelPath)
+    if not objBothWorkbook.worksheets or not objVerticalWorkbook.worksheets:
+        return None
+
+    objVerticalSourceSheet = objVerticalWorkbook.worksheets[0]
+    pszVerticalSheetTitle: str = objVerticalSourceSheet.title
+    if pszVerticalSheetTitle in objBothWorkbook.sheetnames:
+        iSuffix: int = 2
+        while f"{pszVerticalSheetTitle}_{iSuffix}" in objBothWorkbook.sheetnames:
+            iSuffix += 1
+        pszVerticalSheetTitle = f"{pszVerticalSheetTitle}_{iSuffix}"
+
+    objVerticalSheet = objBothWorkbook.create_sheet(title=pszVerticalSheetTitle)
+    copy_excel_sheet_contents(objVerticalSourceSheet, objVerticalSheet)
+
     objBothWorkbook.save(pszOutputPath)
     if EXECUTION_ROOT_DIRECTORY:
         pszTargetDirectory = os.path.join(EXECUTION_ROOT_DIRECTORY, "PJ別損益計算書")
