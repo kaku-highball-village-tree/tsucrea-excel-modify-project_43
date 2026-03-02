@@ -1509,7 +1509,7 @@ def process_pl_tsv(
     )
 
     with open(pszOutputFinalPath, "w", encoding="utf-8", newline="") as objOutputFile:
-        for objRow in objRows:
+        for objRow in objStep0010Rows:
             objOutputFile.write("\t".join(objRow) + "\n")
     write_transposed_tsv(pszOutputFinalPath)
 
