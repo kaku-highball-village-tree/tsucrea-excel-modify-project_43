@@ -2465,6 +2465,58 @@ def sum_tsv_rows(objBaseRows: List[List[str]], objAddRows: List[List[str]]) -> L
 
     return objBaseRows
 
+def can_use_simple_position_sum(
+    objBaseRows: List[List[str]],
+    objAddRows: List[List[str]],
+) -> bool:
+    if not objBaseRows or not objAddRows:
+        return True
+    if len(objBaseRows) != len(objAddRows):
+        return False
+
+    iRowCount: int = len(objBaseRows)
+    for iRowIndex in range(iRowCount):
+        objBaseRow: List[str] = objBaseRows[iRowIndex]
+        objAddRow: List[str] = objAddRows[iRowIndex]
+        if len(objBaseRow) != len(objAddRow):
+            return False
+        if iRowIndex == 0:
+            if objBaseRow != objAddRow:
+                return False
+            continue
+        if (objBaseRow[0] if objBaseRow else "") != (objAddRow[0] if objAddRow else ""):
+            return False
+        for iColumnIndex in range(1, len(objBaseRow)):
+            pszBaseValue: str = objBaseRow[iColumnIndex].strip()
+            pszAddValue: str = objAddRow[iColumnIndex].strip()
+            if pszBaseValue != "" and try_parse_float(pszBaseValue) is None:
+                return False
+            if pszAddValue != "" and try_parse_float(pszAddValue) is None:
+                return False
+    return True
+
+
+def sum_tsv_rows_by_position(
+    objBaseRows: List[List[str]],
+    objAddRows: List[List[str]],
+) -> List[List[str]]:
+    if not objBaseRows:
+        return [list(objRow) for objRow in objAddRows]
+    if not objAddRows:
+        return objBaseRows
+
+    iRowCount: int = len(objBaseRows)
+    for iRowIndex in range(1, iRowCount):
+        objBaseRow: List[str] = objBaseRows[iRowIndex]
+        objAddRow: List[str] = objAddRows[iRowIndex]
+        for iColumnIndex in range(1, len(objBaseRow)):
+            fBase: float = try_parse_float(objBaseRow[iColumnIndex]) or 0.0
+            fAdd: float = try_parse_float(objAddRow[iColumnIndex]) or 0.0
+            objBaseRow[iColumnIndex] = format_number(fBase + fAdd)
+        objBaseRows[iRowIndex] = objBaseRow
+    return objBaseRows
+
+
 
 def write_tsv_rows(pszPath: str, objRows: List[List[str]]) -> None:
     with open(pszPath, "w", encoding="utf-8", newline="") as objFile:
@@ -5782,7 +5834,10 @@ def create_cumulative_report(
         if objTotalRows is None:
             objTotalRows = objRows
         else:
-            objTotalRows = sum_tsv_rows(objTotalRows, objRows)
+            if can_use_simple_position_sum(objTotalRows, objRows):
+                objTotalRows = sum_tsv_rows_by_position(objTotalRows, objRows)
+            else:
+                objTotalRows = sum_tsv_rows(objTotalRows, objRows)
 
     if objTotalRows is None:
         return
