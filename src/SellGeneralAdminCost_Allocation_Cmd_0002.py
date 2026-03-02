@@ -6984,6 +6984,14 @@ def create_step0010_pj_income_statement_range_excel_from_tsvs(
     )
     pszTemplatePath: str = os.path.join(pszScriptDirectory, pszTemplateName)
     if not os.path.isfile(pszTemplatePath):
+        pszEndYearMonth: str = f"{objEnd[0]}年{objEnd[1]:02d}月"
+        pszMonthlyTemplateName: str = (
+            f"TEMPLATE_販管費配賦後_損益計算書_{pszEndYearMonth}_A∪B_プロジェクト名_C∪D_vertical.xlsx"
+            if bVertical
+            else f"TEMPLATE_販管費配賦後_損益計算書_{pszEndYearMonth}_A∪B_プロジェクト名_C∪D.xlsx"
+        )
+        pszTemplatePath = os.path.join(pszScriptDirectory, pszMonthlyTemplateName)
+    if not os.path.isfile(pszTemplatePath):
         return None
 
     objWorkbook = load_workbook(pszTemplatePath)
