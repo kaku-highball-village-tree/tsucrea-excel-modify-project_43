@@ -6944,6 +6944,92 @@ def create_step0010_pj_income_statement_vertical_excel_from_tsv(
     return pszOutputPath
 
 
+def copy_excel_sheet_contents(objSourceSheet, objDestinationSheet) -> None:
+    for iRowIndex, objDimension in objSourceSheet.row_dimensions.items():
+        if objDimension.height is not None:
+            objDestinationSheet.row_dimensions[iRowIndex].height = objDimension.height
+
+    for pszColumnName, objDimension in objSourceSheet.column_dimensions.items():
+        if objDimension.width is not None:
+            objDestinationSheet.column_dimensions[pszColumnName].width = objDimension.width
+
+    for objRow in objSourceSheet.iter_rows():
+        for objCell in objRow:
+            objDestinationCell = objDestinationSheet.cell(
+                row=objCell.row,
+                column=objCell.column,
+                value=objCell.value,
+            )
+            if objCell.has_style:
+                objDestinationCell._style = copy(objCell._style)
+            if objCell.number_format is not None:
+                objDestinationCell.number_format = objCell.number_format
+            if objCell.protection is not None:
+                objDestinationCell.protection = copy(objCell.protection)
+            if objCell.alignment is not None:
+                objDestinationCell.alignment = copy(objCell.alignment)
+            if objCell.fill is not None:
+                objDestinationCell.fill = copy(objCell.fill)
+            if objCell.font is not None:
+                objDestinationCell.font = copy(objCell.font)
+            if objCell.border is not None:
+                objDestinationCell.border = copy(objCell.border)
+
+    for objMergedCellRange in objSourceSheet.merged_cells.ranges:
+        objDestinationSheet.merge_cells(str(objMergedCellRange))
+
+
+def create_step0010_pj_income_statement_both_excel(
+    pszNormalExcelPath: str,
+    pszVerticalExcelPath: str,
+) -> Optional[str]:
+    pszNormalName: str = os.path.basename(pszNormalExcelPath)
+    objMatch = re.fullmatch(
+        r"販管費配賦後_損益計算書_(\d{4}年\d{2}月)_A∪B_プロジェクト名_C∪D\.xlsx",
+        pszNormalName,
+    )
+    if objMatch is None:
+        return None
+    pszYearMonth = objMatch.group(1)
+
+    if not os.path.isfile(pszNormalExcelPath) or not os.path.isfile(pszVerticalExcelPath):
+        return None
+
+    objNormalWorkbook = load_workbook(pszNormalExcelPath)
+    objVerticalWorkbook = load_workbook(pszVerticalExcelPath)
+    if not objNormalWorkbook.worksheets or not objVerticalWorkbook.worksheets:
+        return None
+
+    from openpyxl import Workbook
+
+    objBothWorkbook = Workbook()
+    objDefaultSheet = objBothWorkbook.active
+    objBothWorkbook.remove(objDefaultSheet)
+
+    objNormalSourceSheet = objNormalWorkbook.worksheets[0]
+    objVerticalSourceSheet = objVerticalWorkbook.worksheets[0]
+
+    objNormalSheet = objBothWorkbook.create_sheet(title=objNormalSourceSheet.title)
+    copy_excel_sheet_contents(objNormalSourceSheet, objNormalSheet)
+
+    objVerticalSheet = objBothWorkbook.create_sheet(title=objVerticalSourceSheet.title)
+    copy_excel_sheet_contents(objVerticalSourceSheet, objVerticalSheet)
+
+    pszOutputPath: str = os.path.join(
+        os.path.dirname(pszNormalExcelPath),
+        f"販管費配賦後_損益計算書_{pszYearMonth}_A∪B_プロジェクト名_C∪D_両方.xlsx",
+    )
+    objBothWorkbook.save(pszOutputPath)
+    if EXECUTION_ROOT_DIRECTORY:
+        pszTargetDirectory = os.path.join(EXECUTION_ROOT_DIRECTORY, "PJ別損益計算書")
+        os.makedirs(pszTargetDirectory, exist_ok=True)
+        shutil.copy2(
+            pszOutputPath,
+            os.path.join(pszTargetDirectory, os.path.basename(pszOutputPath)),
+        )
+    return pszOutputPath
+
+
 def create_step0010_pj_income_statement_range_excel_from_tsvs(
     pszDirectory: str,
     objMonthlyPaths: List[str],
@@ -7042,6 +7128,8 @@ def create_step0010_pj_income_statement_range_excel_from_tsvs(
 
 def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
     objOutputs: List[str] = []
+    objNormalOutputByYearMonth: Dict[Tuple[int, int], str] = {}
+    objVerticalOutputByYearMonth: Dict[Tuple[int, int], str] = {}
     objSelectedRangePath: Optional[str] = find_selected_range_path(pszDirectory)
     objSelectedRange = (
         parse_selected_range(objSelectedRangePath)
@@ -7074,6 +7162,9 @@ def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
             pszOutput = create_step0010_pj_income_statement_excel_from_tsv(pszPath)
             if pszOutput is not None:
                 objOutputs.append(pszOutput)
+                objYearMonth = extract_year_month_from_path(pszPath)
+                if objYearMonth is not None:
+                    objNormalOutputByYearMonth[objYearMonth] = pszOutput
             continue
         if re.fullmatch(
             r"損益計算書_販管費配賦_step0010_\d{4}年\d{2}月_A∪B_プロジェクト名_C∪D_vertical\.tsv",
@@ -7087,6 +7178,36 @@ def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
             pszOutput = create_step0010_pj_income_statement_vertical_excel_from_tsv(pszPath)
             if pszOutput is not None:
                 objOutputs.append(pszOutput)
+                objYearMonth = extract_year_month_from_path(pszPath)
+                if objYearMonth is not None:
+                    objVerticalOutputByYearMonth[objYearMonth] = pszOutput
+
+    pszRangeOutput = create_step0010_pj_income_statement_range_excel_from_tsvs(
+        pszDirectory,
+        objMonthlyNormalPaths,
+        False,
+    )
+    if pszRangeOutput is not None:
+        objOutputs.append(pszRangeOutput)
+
+    pszRangeVerticalOutput = create_step0010_pj_income_statement_range_excel_from_tsvs(
+        pszDirectory,
+        objMonthlyVerticalPaths,
+        True,
+    )
+    if pszRangeVerticalOutput is not None:
+        objOutputs.append(pszRangeVerticalOutput)
+
+    objBothYearMonths = sorted(
+        set(objNormalOutputByYearMonth.keys()) & set(objVerticalOutputByYearMonth.keys())
+    )
+    for objYearMonth in objBothYearMonths:
+        pszBothOutput = create_step0010_pj_income_statement_both_excel(
+            objNormalOutputByYearMonth[objYearMonth],
+            objVerticalOutputByYearMonth[objYearMonth],
+        )
+        if pszBothOutput is not None:
+            objOutputs.append(pszBothOutput)
 
     return objOutputs
 
