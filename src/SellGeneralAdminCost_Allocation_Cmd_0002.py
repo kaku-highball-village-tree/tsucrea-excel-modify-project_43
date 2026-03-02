@@ -7148,6 +7148,10 @@ def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
         pszPath = os.path.join(pszDirectory, pszName)
         if not os.path.isfile(pszPath):
             continue
+        if objTargetYearMonth is not None:
+            objYearMonth = extract_year_month_from_path(pszPath)
+            if objYearMonth != objTargetYearMonth:
+                continue
         if re.fullmatch(
             r"損益計算書_販管費配賦_step0010_\d{4}年\d{2}月_A∪B_プロジェクト名_C∪D\.tsv",
             pszName,
