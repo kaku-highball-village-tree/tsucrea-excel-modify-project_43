@@ -296,6 +296,24 @@ def parse_time_to_seconds(pszTimeText: str) -> float:
     return float(iHours * 3600 + iMinutes * 60 + iSeconds)
 
 
+def is_time_text_or_blank(pszTimeText: str) -> bool:
+    pszValue: str = (pszTimeText or "").strip()
+    if pszValue == "":
+        return True
+    return re.match(r"^\d+:\d{2}:\d{2}$", pszValue) is not None
+
+
+def format_seconds_as_time_text(fSeconds: float) -> str:
+    iTotalSeconds: int = int(round(fSeconds))
+    if iTotalSeconds < 0:
+        iTotalSeconds = 0
+    iHours: int = iTotalSeconds // 3600
+    iRemain: int = iTotalSeconds % 3600
+    iMinutes: int = iRemain // 60
+    iSeconds: int = iRemain % 60
+    return f"{iHours}:{iMinutes:02d}:{iSeconds:02d}"
+
+
 def format_number(fValue: float) -> str:
     if abs(fValue - round(fValue)) < 0.0000001:
         return str(int(round(fValue)))
@@ -468,6 +486,67 @@ def write_tsv_rows(pszOutputPath: str, objRows: List[List[str]]) -> None:
             objOutputFile.write("\t".join(objRow) + "\n")
 
 
+def zero_sell_general_admin_cost_for_step0002_targets(objRows: List[List[str]]) -> None:
+    if not objRows:
+        return
+
+    iSellGeneralAdminCostColumnIndex: int = -1
+    objHeaderRow: List[str] = objRows[0]
+    for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
+        if pszColumnName == "販売費及び一般管理費計":
+            iSellGeneralAdminCostColumnIndex = iColumnIndex
+            break
+    if iSellGeneralAdminCostColumnIndex < 0:
+        return
+
+    objTargetNames: set[str] = {
+        "本部",
+        "C006_社長室カンパニー販管費",
+        "C007_本部カンパニー販管費",
+    }
+    for iRowIndex in range(1, len(objRows)):
+        objRow: List[str] = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if pszFirstColumn not in objTargetNames:
+            continue
+        if iSellGeneralAdminCostColumnIndex >= len(objRow):
+            iAppendCount: int = iSellGeneralAdminCostColumnIndex + 1 - len(objRow)
+            objRow.extend([""] * iAppendCount)
+        objRow[iSellGeneralAdminCostColumnIndex] = "0"
+
+
+def zero_sell_general_admin_cost_for_step0006_targets(objRows: List[List[str]]) -> None:
+    if not objRows:
+        return
+
+    iSellGeneralAdminCostColumnIndex: int = -1
+    objHeaderRow: List[str] = objRows[0]
+    for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
+        if pszColumnName == "販売費及び一般管理費計":
+            iSellGeneralAdminCostColumnIndex = iColumnIndex
+            break
+    if iSellGeneralAdminCostColumnIndex < 0:
+        return
+
+    objTargetNames: set[str] = {
+        "合計",
+        "C001_1Cカンパニー販管費",
+        "C002_2Cカンパニー販管費",
+        "C003_3Cカンパニー販管費",
+        "C004_4Cカンパニー販管費",
+        "C005_事業開発カンパニー販管費",
+    }
+    for iRowIndex in range(1, len(objRows)):
+        objRow: List[str] = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if pszFirstColumn not in objTargetNames:
+            continue
+        if iSellGeneralAdminCostColumnIndex >= len(objRow):
+            iAppendCount: int = iSellGeneralAdminCostColumnIndex + 1 - len(objRow)
+            objRow.extend([""] * iAppendCount)
+        objRow[iSellGeneralAdminCostColumnIndex] = "0"
+
+
 def build_step0002_variant_path(pszOutputStep0002Path: str, pszSuffix: str) -> str:
     if pszOutputStep0002Path.lower().endswith(".tsv"):
         return pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
@@ -483,6 +562,8 @@ def generate_step0002_variant_from_step0001(
 ) -> None:
     pszVariantPath: str = build_step0002_variant_path(pszOutputStep0002Path, pszSuffix)
     objRows: List[List[str]] = load_tsv_rows(pszOutputStep0001Path)
+    zero_sell_general_admin_cost_for_step0002_targets(objRows)
+
     (
         iSellGeneralAdminCostColumnIndex,
         iAllocationColumnIndex,
@@ -1108,6 +1189,8 @@ def process_pl_tsv(
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
 
+    zero_sell_general_admin_cost_for_step0002_targets(objRows)
+
     (
         iSellGeneralAdminCostColumnIndex,
         iAllocationColumnIndex,
@@ -1302,35 +1385,7 @@ def process_pl_tsv(
             objOutputFile.write("\t".join(objRow) + "\n")
 
     objRows = allocate_company_sg_admin_cost(objRows)
-
-    iCorporateTaxColumnIndex: int = -1
-    iCorporateTaxTotalColumnIndex: int = -1
-    iNetProfitColumnIndex: int = -1
-    if objRows:
-        objHeaderRow = objRows[0]
-        for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
-            if pszColumnName == "法人税、住民税及び事業税":
-                iCorporateTaxColumnIndex = iColumnIndex
-            elif pszColumnName == "法人税等":
-                iCorporateTaxTotalColumnIndex = iColumnIndex
-            elif pszColumnName == "当期純利益":
-                iNetProfitColumnIndex = iColumnIndex
-
-    if (
-        iCorporateTaxColumnIndex >= 0
-        and iCorporateTaxTotalColumnIndex >= 0
-        and iPreTaxProfitColumnIndex >= 0
-        and iNetProfitColumnIndex >= 0
-    ):
-        recalculate_net_profit(
-            objRows,
-            iCorporateTaxColumnIndex,
-            iCorporateTaxTotalColumnIndex,
-            iPreTaxProfitColumnIndex,
-            iNetProfitColumnIndex,
-        )
-
-    objRows = apply_step0006_second_row_totals(objRows)
+    zero_sell_general_admin_cost_for_step0006_targets(objRows)
 
     with open(pszOutputStep0006Path, "w", encoding="utf-8", newline="") as objOutputFile:
         for objRow in objRows:
@@ -1472,7 +1527,7 @@ def process_pl_tsv(
     )
 
     with open(pszOutputFinalPath, "w", encoding="utf-8", newline="") as objOutputFile:
-        for objRow in objRows:
+        for objRow in objStep0010Rows:
             objOutputFile.write("\t".join(objRow) + "\n")
     write_transposed_tsv(pszOutputFinalPath)
 
@@ -1679,7 +1734,7 @@ def move_pl_tsv_files_into_income_statement_temp_subfolder(pszBaseDirectory: str
     pszTargetDirectory: str = os.path.join(pszTempDirectory, "損益計算書_販管費配賦後")
     os.makedirs(pszTargetDirectory, exist_ok=True)
 
-    objPattern = re.compile(r"^損益計算書_販管費配賦_.*\.tsv$")
+    objPattern = re.compile(r"^(損益計算書_販管費配賦_|累計_損益計算書_販管費配賦_).*.tsv$")
     objSourceDirectories: List[str] = [pszBaseDirectory, pszTempDirectory]
     for pszSourceDirectory in objSourceDirectories:
         if not os.path.isdir(pszSourceDirectory):
@@ -1709,6 +1764,8 @@ def move_monthly_income_statement_tsv_files_into_temp_subfolder(pszBaseDirectory
     ]
     for pszFileName in sorted(os.listdir(pszTempDirectory)):
         if not any(objPattern.match(pszFileName) for objPattern in objPatterns):
+            continue
+        if pszFileName.startswith("累計_損益計算書_販管費配賦_"):
             continue
         pszSourcePath: str = os.path.join(pszTempDirectory, pszFileName)
         if not os.path.isfile(pszSourcePath):
@@ -2425,6 +2482,91 @@ def sum_tsv_rows(objBaseRows: List[List[str]], objAddRows: List[List[str]]) -> L
         objBaseRows[iTargetIndex] = objBaseRow
 
     return objBaseRows
+
+def can_use_simple_position_sum(
+    objBaseRows: List[List[str]],
+    objAddRows: List[List[str]],
+) -> bool:
+    if not objBaseRows or not objAddRows:
+        return True
+    if len(objBaseRows) != len(objAddRows):
+        return False
+
+    objManhourColumns: set[str] = {
+        "工数",
+        "1Cカンパニー販管費の工数",
+        "2Cカンパニー販管費の工数",
+        "3Cカンパニー販管費の工数",
+        "4Cカンパニー販管費の工数",
+        "事業開発カンパニー販管費の工数",
+    }
+
+    iRowCount: int = len(objBaseRows)
+    objHeader: List[str] = objBaseRows[0] if objBaseRows else []
+    for iRowIndex in range(iRowCount):
+        objBaseRow: List[str] = objBaseRows[iRowIndex]
+        objAddRow: List[str] = objAddRows[iRowIndex]
+        if len(objBaseRow) != len(objAddRow):
+            return False
+        if iRowIndex == 0:
+            if objBaseRow != objAddRow:
+                return False
+            continue
+        if (objBaseRow[0] if objBaseRow else "") != (objAddRow[0] if objAddRow else ""):
+            return False
+        for iColumnIndex in range(1, len(objBaseRow)):
+            pszBaseValue: str = objBaseRow[iColumnIndex].strip()
+            pszAddValue: str = objAddRow[iColumnIndex].strip()
+            pszColumnName: str = objHeader[iColumnIndex] if iColumnIndex < len(objHeader) else ""
+            if pszColumnName in objManhourColumns:
+                if not is_time_text_or_blank(pszBaseValue):
+                    return False
+                if not is_time_text_or_blank(pszAddValue):
+                    return False
+                continue
+            if pszBaseValue != "" and try_parse_float(pszBaseValue) is None:
+                return False
+            if pszAddValue != "" and try_parse_float(pszAddValue) is None:
+                return False
+    return True
+
+
+def sum_tsv_rows_by_position(
+    objBaseRows: List[List[str]],
+    objAddRows: List[List[str]],
+) -> List[List[str]]:
+    if not objBaseRows:
+        return [list(objRow) for objRow in objAddRows]
+    if not objAddRows:
+        return objBaseRows
+
+    objManhourColumns: set[str] = {
+        "工数",
+        "1Cカンパニー販管費の工数",
+        "2Cカンパニー販管費の工数",
+        "3Cカンパニー販管費の工数",
+        "4Cカンパニー販管費の工数",
+        "事業開発カンパニー販管費の工数",
+    }
+
+    objHeader: List[str] = objBaseRows[0] if objBaseRows else []
+    iRowCount: int = len(objBaseRows)
+    for iRowIndex in range(1, iRowCount):
+        objBaseRow: List[str] = objBaseRows[iRowIndex]
+        objAddRow: List[str] = objAddRows[iRowIndex]
+        for iColumnIndex in range(1, len(objBaseRow)):
+            pszColumnName: str = objHeader[iColumnIndex] if iColumnIndex < len(objHeader) else ""
+            if pszColumnName in objManhourColumns:
+                fBaseSeconds: float = parse_time_to_seconds(objBaseRow[iColumnIndex])
+                fAddSeconds: float = parse_time_to_seconds(objAddRow[iColumnIndex])
+                objBaseRow[iColumnIndex] = format_seconds_as_time_text(fBaseSeconds + fAddSeconds)
+                continue
+            fBase: float = try_parse_float(objBaseRow[iColumnIndex]) or 0.0
+            fAdd: float = try_parse_float(objAddRow[iColumnIndex]) or 0.0
+            objBaseRow[iColumnIndex] = format_number(fBase + fAdd)
+        objBaseRows[iRowIndex] = objBaseRow
+    return objBaseRows
+
 
 
 def write_tsv_rows(pszPath: str, objRows: List[List[str]]) -> None:
@@ -5743,7 +5885,10 @@ def create_cumulative_report(
         if objTotalRows is None:
             objTotalRows = objRows
         else:
-            objTotalRows = sum_tsv_rows(objTotalRows, objRows)
+            if can_use_simple_position_sum(objTotalRows, objRows):
+                objTotalRows = sum_tsv_rows_by_position(objTotalRows, objRows)
+            else:
+                objTotalRows = sum_tsv_rows(objTotalRows, objRows)
 
     if objTotalRows is None:
         return
@@ -5760,7 +5905,12 @@ def create_cumulative_report_without_company_columns(
     pszDirectory: str,
     objRange: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> None:
-    pszSourcePath: str = build_cumulative_file_path(pszDirectory, "損益計算書", objRange[0], objRange[1])
+    pszSourcePath: str = build_cumulative_file_path(
+        pszDirectory,
+        "損益計算書_販管費配賦",
+        objRange[0],
+        objRange[1],
+    )
     if not os.path.isfile(pszSourcePath):
         return
 
@@ -5791,7 +5941,7 @@ def create_cumulative_report_without_company_columns(
 
     pszOutputPath: str = build_cumulative_file_path(
         pszDirectory,
-        "損益計算書_カンパニー列なし",
+        "損益計算書_販管費配賦_カンパニー列なし",
         objRange[0],
         objRange[1],
     )
@@ -5853,11 +6003,10 @@ def create_cumulative_reports(pszPlPath: str) -> None:
     for objRangeItem in objAllRanges:
         create_cumulative_report(
             pszDirectory,
-            "損益計算書",
+            "損益計算書_販管費配賦",
             objRangeItem,
             pszInputPrefix="損益計算書_販管費配賦",
         )
-        create_cumulative_report_without_company_columns(pszDirectory, objRangeItem)
         create_cumulative_report(pszDirectory, "製造原価報告書", objRangeItem)
         create_pj_summary(
             pszPlPath,
@@ -6885,8 +7034,18 @@ def create_step0010_pj_income_statement_range_excel_from_tsvs(
 
 def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
     objOutputs: List[str] = []
+    objSelectedRangePath: Optional[str] = find_selected_range_path(pszDirectory)
+    objSelectedRange = (
+        parse_selected_range(objSelectedRangePath)
+        if objSelectedRangePath is not None
+        else None
+    )
+    objTargetYearMonth: Optional[Tuple[int, int]] = (
+        objSelectedRange[1] if objSelectedRange is not None else None
+    )
     objMonthlyNormalPaths: List[str] = []
     objMonthlyVerticalPaths: List[str] = []
+
     for pszName in sorted(os.listdir(pszDirectory)):
         pszPath = os.path.join(pszDirectory, pszName)
         if not os.path.isfile(pszPath):
@@ -6896,6 +7055,10 @@ def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
             pszName,
         ) is not None:
             objMonthlyNormalPaths.append(pszPath)
+            if objTargetYearMonth is not None:
+                objYearMonth = extract_year_month_from_path(pszPath)
+                if objYearMonth != objTargetYearMonth:
+                    continue
             pszOutput = create_step0010_pj_income_statement_excel_from_tsv(pszPath)
             if pszOutput is not None:
                 objOutputs.append(pszOutput)
@@ -6905,6 +7068,10 @@ def create_step0010_pj_income_statement_excels(pszDirectory: str) -> List[str]:
             pszName,
         ) is not None:
             objMonthlyVerticalPaths.append(pszPath)
+            if objTargetYearMonth is not None:
+                objYearMonth = extract_year_month_from_path(pszPath)
+                if objYearMonth != objTargetYearMonth:
+                    continue
             pszOutput = create_step0010_pj_income_statement_vertical_excel_from_tsv(pszPath)
             if pszOutput is not None:
                 objOutputs.append(pszOutput)
