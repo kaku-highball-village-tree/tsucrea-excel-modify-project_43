@@ -296,6 +296,24 @@ def parse_time_to_seconds(pszTimeText: str) -> float:
     return float(iHours * 3600 + iMinutes * 60 + iSeconds)
 
 
+def is_time_text_or_blank(pszTimeText: str) -> bool:
+    pszValue: str = (pszTimeText or "").strip()
+    if pszValue == "":
+        return True
+    return re.match(r"^\d+:\d{2}:\d{2}$", pszValue) is not None
+
+
+def format_seconds_as_time_text(fSeconds: float) -> str:
+    iTotalSeconds: int = int(round(fSeconds))
+    if iTotalSeconds < 0:
+        iTotalSeconds = 0
+    iHours: int = iTotalSeconds // 3600
+    iRemain: int = iTotalSeconds % 3600
+    iMinutes: int = iRemain // 60
+    iSeconds: int = iRemain % 60
+    return f"{iHours}:{iMinutes:02d}:{iSeconds:02d}"
+
+
 def format_number(fValue: float) -> str:
     if abs(fValue - round(fValue)) < 0.0000001:
         return str(int(round(fValue)))
@@ -2474,7 +2492,17 @@ def can_use_simple_position_sum(
     if len(objBaseRows) != len(objAddRows):
         return False
 
+    objManhourColumns: set[str] = {
+        "工数",
+        "1Cカンパニー販管費の工数",
+        "2Cカンパニー販管費の工数",
+        "3Cカンパニー販管費の工数",
+        "4Cカンパニー販管費の工数",
+        "事業開発カンパニー販管費の工数",
+    }
+
     iRowCount: int = len(objBaseRows)
+    objHeader: List[str] = objBaseRows[0] if objBaseRows else []
     for iRowIndex in range(iRowCount):
         objBaseRow: List[str] = objBaseRows[iRowIndex]
         objAddRow: List[str] = objAddRows[iRowIndex]
@@ -2489,6 +2517,13 @@ def can_use_simple_position_sum(
         for iColumnIndex in range(1, len(objBaseRow)):
             pszBaseValue: str = objBaseRow[iColumnIndex].strip()
             pszAddValue: str = objAddRow[iColumnIndex].strip()
+            pszColumnName: str = objHeader[iColumnIndex] if iColumnIndex < len(objHeader) else ""
+            if pszColumnName in objManhourColumns:
+                if not is_time_text_or_blank(pszBaseValue):
+                    return False
+                if not is_time_text_or_blank(pszAddValue):
+                    return False
+                continue
             if pszBaseValue != "" and try_parse_float(pszBaseValue) is None:
                 return False
             if pszAddValue != "" and try_parse_float(pszAddValue) is None:
@@ -2505,11 +2540,27 @@ def sum_tsv_rows_by_position(
     if not objAddRows:
         return objBaseRows
 
+    objManhourColumns: set[str] = {
+        "工数",
+        "1Cカンパニー販管費の工数",
+        "2Cカンパニー販管費の工数",
+        "3Cカンパニー販管費の工数",
+        "4Cカンパニー販管費の工数",
+        "事業開発カンパニー販管費の工数",
+    }
+
+    objHeader: List[str] = objBaseRows[0] if objBaseRows else []
     iRowCount: int = len(objBaseRows)
     for iRowIndex in range(1, iRowCount):
         objBaseRow: List[str] = objBaseRows[iRowIndex]
         objAddRow: List[str] = objAddRows[iRowIndex]
         for iColumnIndex in range(1, len(objBaseRow)):
+            pszColumnName: str = objHeader[iColumnIndex] if iColumnIndex < len(objHeader) else ""
+            if pszColumnName in objManhourColumns:
+                fBaseSeconds: float = parse_time_to_seconds(objBaseRow[iColumnIndex])
+                fAddSeconds: float = parse_time_to_seconds(objAddRow[iColumnIndex])
+                objBaseRow[iColumnIndex] = format_seconds_as_time_text(fBaseSeconds + fAddSeconds)
+                continue
             fBase: float = try_parse_float(objBaseRow[iColumnIndex]) or 0.0
             fAdd: float = try_parse_float(objAddRow[iColumnIndex]) or 0.0
             objBaseRow[iColumnIndex] = format_number(fBase + fAdd)
