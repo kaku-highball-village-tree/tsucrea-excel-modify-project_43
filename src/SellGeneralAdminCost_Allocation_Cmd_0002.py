@@ -497,6 +497,38 @@ def zero_sell_general_admin_cost_for_step0002_targets(objRows: List[List[str]]) 
         objRow[iSellGeneralAdminCostColumnIndex] = "0"
 
 
+def zero_sell_general_admin_cost_for_step0006_targets(objRows: List[List[str]]) -> None:
+    if not objRows:
+        return
+
+    iSellGeneralAdminCostColumnIndex: int = -1
+    objHeaderRow: List[str] = objRows[0]
+    for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
+        if pszColumnName == "販売費及び一般管理費計":
+            iSellGeneralAdminCostColumnIndex = iColumnIndex
+            break
+    if iSellGeneralAdminCostColumnIndex < 0:
+        return
+
+    objTargetNames: set[str] = {
+        "合計",
+        "C001_1Cカンパニー販管費",
+        "C002_2Cカンパニー販管費",
+        "C003_3Cカンパニー販管費",
+        "C004_4Cカンパニー販管費",
+        "C005_事業開発カンパニー販管費",
+    }
+    for iRowIndex in range(1, len(objRows)):
+        objRow: List[str] = objRows[iRowIndex]
+        pszFirstColumn: str = (objRow[0] if objRow else "").strip()
+        if pszFirstColumn not in objTargetNames:
+            continue
+        if iSellGeneralAdminCostColumnIndex >= len(objRow):
+            iAppendCount: int = iSellGeneralAdminCostColumnIndex + 1 - len(objRow)
+            objRow.extend([""] * iAppendCount)
+        objRow[iSellGeneralAdminCostColumnIndex] = "0"
+
+
 def build_step0002_variant_path(pszOutputStep0002Path: str, pszSuffix: str) -> str:
     if pszOutputStep0002Path.lower().endswith(".tsv"):
         return pszOutputStep0002Path[: -len(".tsv")] + pszSuffix + ".tsv"
@@ -1335,6 +1367,7 @@ def process_pl_tsv(
             objOutputFile.write("\t".join(objRow) + "\n")
 
     objRows = allocate_company_sg_admin_cost(objRows)
+    zero_sell_general_admin_cost_for_step0006_targets(objRows)
 
     with open(pszOutputStep0006Path, "w", encoding="utf-8", newline="") as objOutputFile:
         for objRow in objRows:
