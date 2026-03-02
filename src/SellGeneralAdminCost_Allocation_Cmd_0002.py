@@ -5901,7 +5901,6 @@ def create_cumulative_reports(pszPlPath: str) -> None:
             objRangeItem,
             pszInputPrefix="損益計算書_販管費配賦",
         )
-        create_cumulative_report_without_company_columns(pszDirectory, objRangeItem)
         create_cumulative_report(pszDirectory, "製造原価報告書", objRangeItem)
         create_pj_summary(
             pszPlPath,
