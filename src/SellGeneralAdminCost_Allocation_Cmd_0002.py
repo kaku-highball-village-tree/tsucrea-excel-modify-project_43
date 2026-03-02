@@ -1336,33 +1336,6 @@ def process_pl_tsv(
 
     objRows = allocate_company_sg_admin_cost(objRows)
 
-    iCorporateTaxColumnIndex: int = -1
-    iCorporateTaxTotalColumnIndex: int = -1
-    iNetProfitColumnIndex: int = -1
-    if objRows:
-        objHeaderRow = objRows[0]
-        for iColumnIndex, pszColumnName in enumerate(objHeaderRow):
-            if pszColumnName == "法人税、住民税及び事業税":
-                iCorporateTaxColumnIndex = iColumnIndex
-            elif pszColumnName == "法人税等":
-                iCorporateTaxTotalColumnIndex = iColumnIndex
-            elif pszColumnName == "当期純利益":
-                iNetProfitColumnIndex = iColumnIndex
-
-    if (
-        iCorporateTaxColumnIndex >= 0
-        and iCorporateTaxTotalColumnIndex >= 0
-        and iPreTaxProfitColumnIndex >= 0
-        and iNetProfitColumnIndex >= 0
-    ):
-        recalculate_net_profit(
-            objRows,
-            iCorporateTaxColumnIndex,
-            iCorporateTaxTotalColumnIndex,
-            iPreTaxProfitColumnIndex,
-            iNetProfitColumnIndex,
-        )
-
     with open(pszOutputStep0006Path, "w", encoding="utf-8", newline="") as objOutputFile:
         for objRow in objRows:
             objOutputFile.write("\t".join(objRow) + "\n")
