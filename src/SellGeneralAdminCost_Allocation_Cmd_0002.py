@@ -6011,7 +6011,7 @@ def create_cumulative_reports(pszPlPath: str) -> None:
         create_pj_summary(
             pszPlPath,
             objRangeItem,
-            create_step0007=objRangeItem in objCurrentRanges,
+            create_step0007=True,
             bWriteTotalsExcel=objRangeItem in objTotalsExcelRanges,
         )
     objMonths = build_month_sequence(objStart, objEnd)
